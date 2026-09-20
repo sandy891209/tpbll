@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TPBL 賽事特區</title>
+    <style>
+        :root {
+            /* 品牌與基礎色彩 */
+            --primary: #0F3B66; /* 單寧藍 */
+            --secondary: #CCA87B; /* 金色 */
+            --bg-color: #FFFFFF; /* 全白背景 */
+            --card-bg: #FFFFFF;
+            --text-main: #1C1C1E;
+            --text-sub: #8E8E93;
+            --live-red: #FF3B30;
+            --border-color: rgba(0,0,0,0.06);
+        }
+
+        * {
+            box-sizing: border-box; margin: 0; padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body { background-color: var(--bg-color); color: var(--text-main); padding-bottom: 120px; }
+
+        /* --- 頂部標題列 --- */
+        header {
+            background-color: var(--primary); position: sticky; top: 0; z-index: 100;
+            height: 60px; display: flex; justify-content: center; align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding-top: max(0px, env(safe-area-inset-top));
+        }
+        header img { height: 36px; object-fit: contain; }
+        
+        .btn-back {
+            position: absolute; left: 16px; color: #fff; background: none; border: none;
+            font-size: 16px; font-weight: 600; display: none; align-items: center; cursor: pointer;
+        }
+        .btn-back::before { content: "‹"; font-size: 26px; margin-right: 4px; transform: translateY(-2px); }
+
+        /* --- 視圖控制 --- */
+        .view-content { display: none; animation: fadeIn 0.3s ease; }
+        .view-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+        .content-padding { padding: 20px; }
+
+        /* --- 賽程雙頁籤 --- */
+        .segmented-control {
+            display: flex; background: rgba(118, 118, 128, 0.12); border-radius: 9px;
+            padding: 2px; margin: 20px 20px 12px 20px;
+        }
+        .segment-btn {
+            flex: 1; padding: 8px 0; text-align: center; font-size: 14px; font-weight: 600;
+            color: var(--text-main); border-radius: 7px; cursor: pointer; transition: all 0.2s ease;
+        }
+        .segment-btn.active { background: var(--card-bg); box-shadow: 0 3px 8px rgba(0,0,0,0.12), 0 3px 1px rgba(0,0,0,0.04); }
+
+        /* --- 月份篩選器 (Chips) --- */
+        .month-filters {
+            display: flex; gap: 8px; overflow-x: auto; padding: 0 20px 12px 20px;
+            -ms-overflow-style: none; scrollbar-width: none;
+        }
+        .month-filters::-webkit-scrollbar { display: none; }
+        .month-chip {
+            padding: 6px 16px; border-radius: 16px; background: rgba(118, 118, 128, 0.12); font-size: 14px;
+            white-space: nowrap; font-weight: 600; color: var(--text-main); cursor: pointer; transition: 0.2s;
+        }
+        .month-chip.active { background: var(--primary); color: #fff; }
+
+        /* --- Home 區塊標題 --- */
+        .section-title { font-size: 22px; font-weight: 700; margin-bottom: 16px; letter-spacing: -0.5px;}
+        
+        /* 輪播圖卡 */
+        .carousel-wrapper { position: relative; margin-bottom: 24px;}
+        .carousel-container { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 16px; padding-bottom: 8px; -ms-overflow-style: none; scrollbar-width: none; }
+        .carousel-container::-webkit-scrollbar { display: none; }
+        .carousel-dots { display: flex; justify-content: center; gap: 6px; margin-top: 12px; margin-bottom: 8px; }
+        .dot { width: 6px; height: 6px; background-color: rgba(15, 59, 102, 0.2); border-radius: 3px; transition: all 0.3s ease; }
+        .dot.active { width: 16px; background-color: var(--primary); }
+
+        /* --- 卡片通用設計 (全白背景下的立體感) --- */
+        .card-style {
+            background: var(--card-bg); border-radius: 16px; padding: 16px;
+            border: 1px solid var(--border-color); box-shadow: 0 4px 16px rgba(0,0,0,0.03);
+        }
+
+        /* 賽程卡片 */
+        .game-card { min-width: 88vw; scroll-snap-align: center; display: flex; flex-direction: column; gap: 12px; }
+        .schedule-list { padding: 0 20px 20px 20px; }
+        .schedule-list .game-card { min-width: 100%; margin-bottom: 16px; scroll-snap-align: none; }
+
+        .game-header { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text-sub); border-bottom: 1px solid var(--border-color); padding-bottom: 12px; }
+        .status-badge { font-weight: 700; display: inline-flex; align-items: center; gap: 6px; }
+        .status-live { color: var(--live-red); }
+        .live-dot { width: 8px; height: 8px; background-color: var(--live-red); border-radius: 50%; animation: blink 1.5s infinite ease-in-out; }
+        @keyframes blink { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } }
+        .game-venue { color: var(--text-main); font-weight: 600; margin-left: 6px;}
+
+        .team-row { display: flex; align-items: center; justify-content: space-between; font-size: 16px; font-weight: 600; margin-top: 4px; }
+        .team-info { display: flex; align-items: center; gap: 12px; }
+        .team-logo { width: 36px; height: 36px; object-fit: contain; }
+        .score { font-size: 24px; font-weight: 700; color: var(--text-main); font-variant-numeric: tabular-nums; }
+
+        .btn-group { display: flex; gap: 12px; margin-top: 4px; }
+        .btn { flex: 1; padding: 10px 0; border-radius: 8px; font-size: 14px; font-weight: 600; text-align: center; cursor: pointer; border: none; transition: opacity 0.2s; }
+        .btn:active { opacity: 0.7; }
+        .btn-boxscore { background-color: var(--primary); color: #fff; }
+        .btn-ticket { background-color: #F2F2F7; color: var(--primary); }
+
+        /* --- 戰績排行 Standings --- */
+        .standings-table { width: 100%; border-collapse: collapse; text-align: center; font-size: 14px; margin-bottom: 30px;}
+        .standings-table th { color: var(--text-sub); font-weight: 500; font-size: 12px; padding: 8px 4px; border-bottom: 1px solid var(--border-color); }
+        .standings-table td { padding: 12px 4px; border-bottom: 1px solid var(--border-color); font-weight: 600; }
+        .standings-team { display: flex; align-items: center; gap: 8px; text-align: left; }
+        .standings-logo { width: 24px; height: 24px; object-fit: contain; }
+
+        /* --- 最新快訊 News --- */
+        .news-item { display: flex; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border-color); cursor: pointer;}
+        .news-item:last-child { border-bottom: none; }
+        .news-thumb { width: 100px; height: 70px; border-radius: 8px; object-fit: cover; }
+        .news-text { display: flex; flex-direction: column; gap: 6px; flex: 1; }
+        .news-title { font-size: 15px; font-weight: 600; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--text-main);}
+        .news-date { font-size: 12px; color: var(--text-sub); }
+
+        /* --- 月份 Sticky Header --- */
+        .month-header {
+            font-size: 18px; font-weight: 700; color: var(--primary); background: var(--bg-color);
+            padding: 8px 0 12px 0; position: sticky; top: 60px; z-index: 90;
+        }
+
+        /* --- iOS 懸浮透明底部導航列 --- */
+        .bottom-nav {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+            width: calc(100% - 48px); max-width: 400px; height: 68px;
+            background: rgba(255, 255, 255, 0.75); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            border-radius: 34px; box-shadow: 0 8px 32px rgba(0,0,0,0.12); border: 1px solid rgba(255,255,255,0.4);
+            display: flex; justify-content: space-around; align-items: center; padding: 0 16px;
+            z-index: 1000; transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .bottom-nav.hidden { transform: translate(-50%, 150%); }
+        .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--text-sub); cursor: pointer; width: 50%; transition: color 0.2s; }
+        .nav-item.active { color: var(--primary); }
+        .nav-item svg { width: 24px; height: 24px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+        .nav-item.active .icon-home path { fill: currentColor; }
+        .nav-label { font-size: 10px; font-weight: 600; }
+
+        /* ================= Box Score 頁面 ================= */
+        .bs-container { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+        
+        /* 頂部置中比分 */
+        .bs-scoreboard { display: flex; justify-content: space-between; align-items: center; padding: 10px 0;}
+        .bs-team-col { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 33%; }
+        .bs-team-logo { width: 64px; height: 64px; object-fit: contain; }
+        .bs-team-name { font-size: 15px; font-weight: 700; color: var(--text-main); text-align: center; }
+        .bs-score-col { font-size: 44px; font-weight: 800; color: var(--primary); letter-spacing: -1px;}
+
+        /* 各節比分表 */
+        .q-table { width: 100%; border-collapse: collapse; text-align: center; font-size: 14px; font-weight: 600;}
+        .q-table th { color: var(--text-sub); padding-bottom: 8px; font-weight: 500; font-size: 12px; }
+        .q-table td { padding: 10px 0; border-top: 1px solid var(--border-color); }
+        .q-table td:first-child { text-align: left; color: var(--text-sub); font-weight: 500;}
+        .q-table td:last-child { color: var(--primary); font-weight: 800; }
+
+        /* 蝴蝶圖 (團隊數據對比) */
+        .bf-title { text-align: center; font-size: 16px; font-weight: 700; color: var(--primary); margin-bottom: 20px; }
+        .bf-row { display: flex; align-items: center; margin-bottom: 12px; font-size: 14px; font-weight: 700; }
+        .bf-val { width: 44px; text-align: center; }
+        .bf-label { width: 64px; text-align: center; color: var(--text-sub); font-size: 12px; font-weight: 600;}
+        .bf-bar-wrap { flex: 1; height: 6px; background: #F2F2F7; border-radius: 3px; display: flex; align-items: center; }
+        .bf-bar-left { justify-content: flex-end; }
+        .bf-fill { height: 100%; border-radius: 3px; }
+
+        /* 球員數據表 */
+        .team-tabs { display: flex; background: rgba(118, 118, 128, 0.12); border-radius: 8px; padding: 2px; margin-bottom: 12px; }
+        .team-tab { flex: 1; text-align: center; padding: 8px; font-weight: 600; color: var(--text-main); font-size: 14px; border-radius: 6px; cursor: pointer;}
+        .team-tab.active { background: var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+
+        .stats-table-wrapper { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 8px;}
+        .stats-table { width: 100%; border-collapse: collapse; text-align: center; white-space: nowrap; font-size: 13px; }
+        .stats-table th { color: var(--text-sub); font-weight: 500; padding: 10px 8px; border-bottom: 1px solid var(--border-color); font-size: 12px; background: #fff;}
+        .stats-table td { padding: 10px 8px; border-bottom: 1px solid var(--border-color); font-weight: 500; background: #fff;}
+        .stats-table th:first-child, .stats-table td:first-child { position: sticky; left: 0; z-index: 2; text-align: left; padding-left: 0; box-shadow: 2px 0 4px rgba(0,0,0,0.02);}
+        
+        .player-info { display: flex; align-items: center; gap: 8px; }
+        .player-avatar { width: 32px; height: 32px; border-radius: 50%; background: #f2f2f7; object-fit: cover; border: 1px solid var(--border-color); }
+        .player-name-wrap { display: flex; flex-direction: column; }
+        .player-name { font-weight: 700; color: var(--text-main); font-size: 14px;}
+        .player-pos { font-size: 10px; color: var(--text-sub); font-weight: 600;}
+
+        .row-total td { background: #fafafa !important; font-weight: 800; color: var(--primary); }
+
+        .loader { text-align: center; padding: 40px; color: var(--primary); font-weight: 600; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <button id="btn-back" class="btn-back" onclick="closeBoxScore()">賽程</button>
+        <img id="logo-img" src="https://cdn.phototourl.com/free/2026-09-20-2cfd028f-604c-4f63-b48a-e0b33de3c093.png" alt="TPBL Logo">
+    </header>
+
+    <!-- === Home 頁面 === -->
+    <main id="view-home" class="view-content active">
+        <div class="content-padding">
+            <!-- 焦點賽事 -->
+            <div class="section-title">焦點賽事</div>
+            <div class="carousel-wrapper">
+                <div class="carousel-container" id="home-carousel"></div>
+            </div>
+            <div class="carousel-dots" id="home-dots"></div>
+
+            <!-- 戰績排行 -->
+            <div class="section-title" style="margin-top: 32px;">戰績排行</div>
+            <div class="card-style" style="padding: 0 16px;">
+                <table class="standings-table">
+                    <thead><tr><th style="text-align:left; width:30px;">#</th><th style="text-align:left;">球隊</th><th>W-L</th><th>勝率</th><th>勝差</th></tr></thead>
+                    <tbody id="home-standings"></tbody>
+                </table>
+            </div>
+
+            <!-- 最新快訊 -->
+            <div class="section-title" style="margin-top: 32px;">最新快訊</div>
+            <div class="card-style" id="home-news" style="padding: 4px 16px;">
+                <div class="loader">讀取快訊中...</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- === 賽程 頁面 === -->
+    <main id="view-schedule" class="view-content">
+        <div class="segmented-control">
+            <div class="segment-btn active" onclick="switchScheduleState('upcoming')">即將到來</div>
+            <div class="segment-btn" onclick="switchScheduleState('completed')">已完成</div>
+        </div>
+        <div class="month-filters" id="month-filters"></div>
+        <div id="schedule-list-container" class="schedule-list"></div>
+    </main>
+
+    <!-- === Boxscore 頁面 === -->
+    <main id="view-boxscore" class="view-content">
+        <div id="boxscore-content" class="bs-container"></div>
+    </main>
+
+    <!-- === iOS 懸浮透明底部導航 === -->
+    <nav class="bottom-nav" id="bottom-nav">
+        <div class="nav-item active" onclick="switchView('home', this)">
+            <svg class="icon-home" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+            <div class="nav-label">Home</div>
+        </div>
+        <div class="nav-item" onclick="switchView('schedule', this)">
+            <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            <div class="nav-label">賽程</div>
+        </div>
+    </nav>
+
+    <script>
+        // --- 全域常數與快取 ---
+        const LOGOS = { "海神": "https://i.postimg.cc/KYtTwqdg/aquas_CB_Rq9NB.webp", "夢想家": "https://i.postimg.cc/ZRZNSPSL/dreamers_8u_P5Ali_T.webp", "攻城獅": "https://i.postimg.cc/FRmS4b4n/lioneers_DTfku_EJZ.webp", "戰神": "https://i.postimg.cc/V61t898V/mars_Bb_DWfk_G6.webp", "特攻": "https://i.postimg.cc/Qts73g3J/dea_BEf_Nf_G39.webp", "國王": "https://i.postimg.cc/XJ35bKb2/kings_Dsun_MN_K.webp", "雲豹": "https://i.postimg.cc/XJ35bKbH/leopards_BGzl_SG8M.webp" };
+        const KEYWORD_ORDER = ["攻城獅", "特攻", "國王", "戰神", "雲豹", "夢想家", "海神"];
+        const TEAM_COLORS = { "戰神": "#DD827C", "國王": "#F6ECA7", "雲豹": "#8DA49B", "海神": "#99AEE0", "特攻": "#F3E19E", "攻城獅": "#A39AC0", "夢想家": "#CEDAAA" };
+        const DEFAULT_AVATAR = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23CCA87B' stroke='white' stroke-width='1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='12' cy='7' r='4'/%3E%3C/svg%3E";
+        const POS_MAP = { "PointGuard": "PG", "ShootingGuard": "SG", "SmallForward": "SF", "PowerForward": "PF", "Center": "C", "PointGuardAndShootingGuard": "G", "SmallForwardAndPowerForward": "F" };
+        const TEAM_TICKET_URLS = { "攻城獅": "https://tixcraft.com/activity/detail/25_lioneers", "特攻": "https://tix.ctbcsports.com/DEA", "國王": "https://newtaipeikings.kktix.cc/events/lojke", "戰神": "https://www.famiticket.com.tw/Home/Activity/Info/bgBRAG0AcABKAE0AMQB5AGgAWQBVAGgANQBEAEwARwBMAEcAYwBvAG8AMQAvAGkATgBqAC8AcQBtAEYAcQBMAEkAdABXAHAANABqAEMAYwB2AEYAUQA9AA2", "雲豹": "https://leopards.kktix.cc/events/afrehwe", "夢想家": "https://ticket.ibon.com.tw/ActivityInfo/Details/39190", "海神": "https://www.famiticket.com.tw/Home/Activity/Info/bgBRAG0AcABKAE0AMQB5AGgAWQBVAGgANQBEAEwARwBMAEcAYwBvAG8AMQAvAGkATgBqAC8AcQBtAEYAcQBMAEkAdABXAHAANABqAEMAYwB2AEYAUQA9AA2" };
+
+        let allGames = [];
+        let currentScheduleState = 'upcoming'; 
+        let boxscoreDataCache = null; 
+        let playerAvatars = {}; // 暫存所有球員大頭貼
+
+        // --- 工具函式 ---
+        function getTeamKeyword(fullName) {
+            for (let kw of KEYWORD_ORDER) { if (fullName.includes(kw)) return kw; }
+            return fullName;
+        }
+        function formatMMSS(seconds) {
+            const m = Math.floor(seconds / 60); const s = seconds % 60;
+            return `${m}:${s.toString().padStart(2, '0')}`;
+        }
+        function getMonthStr(dateString) {
+            const d = new Date(dateString); return `${d.getFullYear()}年${d.getMonth() + 1}月`;
+        }
+        function getLogo(teamName) {
+            return LOGOS[getTeamKeyword(teamName)] || "";
+        }
+
+        // --- 視圖切換 ---
+        function switchView(viewName, element) {
+            document.querySelectorAll('.view-content').forEach(el => el.classList.remove('active'));
+            if(element) {
+                document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+                element.classList.add('active');
+            }
+            document.getElementById(`view-${viewName}`).classList.add('active');
+            window.scrollTo(0, 0);
+
+            const backBtn = document.getElementById('btn-back');
+            const logo = document.getElementById('logo-img');
+            const bottomNav = document.getElementById('bottom-nav');
+
+            if (viewName === 'boxscore') {
+                backBtn.style.display = 'flex'; logo.style.display = 'none'; bottomNav.classList.add('hidden');
+            } else {
+                backBtn.style.display = 'none'; logo.style.display = 'block'; bottomNav.classList.remove('hidden');
+            }
+        }
+
+        // --- 賽程邏輯 ---
+        function switchScheduleState(state) {
+            currentScheduleState = state;
+            document.querySelectorAll('.segment-btn').forEach(btn => btn.classList.remove('active'));
+            event.target.classList.add('active');
+            renderMonthFilters();
+        }
+
+        function renderMonthFilters() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            let filteredGames = currentScheduleState === 'upcoming' 
+                ? allGames.filter(g => g.game_date >= todayStr)
+                : allGames.filter(g => g.game_date < todayStr);
+
+            // 如果已完成沒資料，強拉兩筆過來 Demo
+            if (currentScheduleState === 'completed' && filteredGames.length === 0 && allGames.length > 2) {
+                filteredGames = [allGames[0], allGames[1]];
+            }
+
+            const months = [...new Set(filteredGames.map(g => getMonthStr(g.game_date)))];
+            const filterContainer = document.getElementById('month-filters');
+            let chipsHtml = `<div class="month-chip active" onclick="filterGamesByMonth('all', this)">全部</div>`;
+            chipsHtml += months.map(m => `<div class="month-chip" onclick="filterGamesByMonth('${m}', this)">${m}</div>`).join('');
+            filterContainer.innerHTML = chipsHtml;
+
+            renderScheduleList(filteredGames, 'all');
+        }
+
+        function filterGamesByMonth(monthStr, element) {
+            document.querySelectorAll('.month-chip').forEach(c => c.classList.remove('active'));
+            element.classList.add('active');
+
+            const todayStr = new Date().toISOString().split('T')[0];
+            let targetGames = currentScheduleState === 'upcoming' 
+                ? allGames.filter(g => g.game_date >= todayStr)
+                : allGames.filter(g => g.game_date < todayStr);
+                
+            if (currentScheduleState === 'completed' && targetGames.length === 0) targetGames = [allGames[0], allGames[1]];
+            renderScheduleList(targetGames, monthStr);
+        }
+
+        function renderScheduleList(games, monthStr) {
+            const container = document.getElementById('schedule-list-container');
+            let renderGames = monthStr === 'all' ? games : games.filter(g => getMonthStr(g.game_date) === monthStr);
+            const statusType = currentScheduleState === 'upcoming' ? 'UPCOMING' : 'COMPLETED';
+            
+            container.innerHTML = renderGames.map(g => createGameCard(g, statusType)).join('');
+            if(renderGames.length === 0) container.innerHTML = '<div style="text-align:center; padding:40px; color:var(--text-sub);">無賽事資料</div>';
+        }
+
+        function createGameCard(game, statusType) {
+            let scoreHome = '-'; let scoreAway = '-'; let statusHtml = ''; let btnHtml = '';
+            const dateStr = game.game_date.slice(5) + ' ' + game.game_day_of_week;
+            const timeStr = game.game_time.slice(0,5);
+            
+            const homeKw = getTeamKeyword(game.home_team.name);
+            const ticketUrl = TEAM_TICKET_URLS[homeKw] || '#';
+            const homeLogo = getLogo(game.home_team.name) || game.home_team.meta.logo;
+            const awayLogo = getLogo(game.away_team.name) || game.away_team.meta.logo;
+
+            if (statusType === 'LIVE') {
+                scoreHome = Math.floor(Math.random() * 10 + 60); scoreAway = Math.floor(Math.random() * 10 + 60);
+                statusHtml = `<div class="status-badge status-live"><div class="live-dot"></div>進行中</div>`;
+                btnHtml = `<button class="btn btn-boxscore" onclick="openBoxScore()">Boxscore</button>`;
+            } else if (statusType === 'COMPLETED') {
+                scoreHome = Math.floor(Math.random() * 20 + 90); scoreAway = Math.floor(Math.random() * 20 + 90);
+                statusHtml = `<div class="status-badge" style="color: var(--text-main);">已結束</div>`;
+                btnHtml = `<button class="btn btn-boxscore" onclick="openBoxScore()">Boxscore</button>`;
+            } else {
+                statusHtml = `<div class="status-badge" style="color: var(--text-sub);">即將到來</div>`;
+                btnHtml = `<button class="btn btn-ticket" onclick="window.open('${ticketUrl}', '_blank')">Ticket</button>`;
+            }
+
+            return `
+                <div class="game-card card-style">
+                    <div class="game-header">
+                        ${statusHtml}
+                        <span>${dateStr} ${timeStr} <span class="game-venue">@ ${game.venue}</span></span>
+                    </div>
+                    <div class="team-row">
+                        <div class="team-info"><img class="team-logo" src="${awayLogo}"><span>${game.away_team.name}</span></div>
+                        <div class="score">${scoreAway}</div>
+                    </div>
+                    <div class="team-row">
+                        <div class="team-info"><img class="team-logo" src="${homeLogo}"><span>${game.home_team.name}</span></div>
+                        <div class="score">${scoreHome}</div>
+                    </div>
+                    <div class="btn-group">${btnHtml}</div>
+                </div>
+            `;
+        }
+
+        // --- Box Score 頁面 ---
+        async function openBoxScore() {
+            switchView('boxscore');
+            const content = document.getElementById('boxscore-content');
+            content.innerHTML = '<div class="loader">讀取數據中...</div>';
+
+            try {
+                const res = await fetch('https://api.tpbl.basketball/api/games/8641/stats');
+                boxscoreDataCache = await res.json();
+                renderBoxScore('away'); 
+            } catch(e) { content.innerHTML = '<div class="loader">資料載入失敗</div>'; }
+        }
+
+        function closeBoxScore() { switchView('schedule', document.querySelectorAll('.nav-item')[1]); }
+
+        function renderButterflyRow(label, awayVal, homeVal, isPct=false) {
+            const aNum = parseFloat(awayVal) || 0; const hNum = parseFloat(homeVal) || 0;
+            const total = aNum + hNum || 1;
+            const aPct = (aNum / total) * 100; const hPct = (hNum / total) * 100;
+            
+            // 表現較好的呈現金色
+            const aColor = aNum >= hNum && aNum > 0 ? 'var(--secondary)' : '#E5E5EA';
+            const hColor = hNum >= aNum && hNum > 0 ? 'var(--secondary)' : '#E5E5EA';
+            
+            return `
+                <div class="bf-row">
+                    <div class="bf-val">${awayVal}${isPct?'%':''}</div>
+                    <div class="bf-bar-wrap bf-bar-left"><div class="bf-fill" style="width:${aPct}%; background:${aColor};"></div></div>
+                    <div class="bf-label">${label}</div>
+                    <div class="bf-bar-wrap"><div class="bf-fill" style="width:${hPct}%; background:${hColor};"></div></div>
+                    <div class="bf-val">${homeVal}${isPct?'%':''}</div>
+                </div>
+            `;
+        }
+
+        function buildPlayerTable(playersObj) {
+            const players = Object.values(playersObj).sort((a,b) => b.time_on_court - a.time_on_court);
+            const starters = players.filter(p => p.is_starting && p.time_on_court > 0);
+            const bench = players.filter(p => !p.is_starting && p.time_on_court > 0);
+
+            const genRow = (p) => {
+                const avatar = playerAvatars[p.gohoops_roster_id] || DEFAULT_AVATAR;
+                return `
+                <tr>
+                    <td>
+                        <div class="player-info">
+                            <img src="${avatar}" class="player-avatar" onerror="this.src='${DEFAULT_AVATAR}'">
+                            <div class="player-name-wrap">
+                                <span class="player-name">${p.name} <span style="color:var(--text-sub); font-weight:500;">#${p.number}</span></span>
+                                <span class="player-pos">${POS_MAP[p.positions] || p.positions}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>${formatMMSS(p.time_on_court)}</td>
+                    <td style="font-weight:800;">${p.score}</td>
+                    <td>${p.field_goals}</td>
+                    <td>${p.three_pointers}</td>
+                    <td>${p.free_throws}</td>
+                    <td>${p.rebounds}</td>
+                    <td>${p.assists}</td>
+                    <td>${p.steals}</td>
+                    <td>${p.blocks}</td>
+                    <td>${p.turnovers}</td>
+                    <td>${p.fouls}</td>
+                </tr>`;
+            };
+
+            let html = `
+                <div class="stats-table-wrapper">
+                    <table class="stats-table">
+                        <thead><tr><th>球員</th><th>MIN</th><th>PTS</th><th>FG</th><th>3PT</th><th>FT</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>TO</th><th>PF</th></tr></thead>
+                        <tbody>`;
+            
+            if(starters.length > 0) {
+                html += `<tr><td colspan="12" style="text-align:left; background:#f9f9f9; color:var(--text-sub); font-size:12px; font-weight:600;">先發 STARTERS</td></tr>`;
+                html += starters.map(genRow).join('');
+            }
+            if(bench.length > 0) {
+                html += `<tr><td colspan="12" style="text-align:left; background:#f9f9f9; color:var(--text-sub); font-size:12px; font-weight:600;">替補 BENCH</td></tr>`;
+                html += bench.map(genRow).join('');
+            }
+            return html + `</tbody></table></div>`;
+        }
+
+        function renderBoxScore(teamType) {
+            if (!boxscoreDataCache) return;
+            const { home_team: home, away_team: away } = boxscoreDataCache;
+            const hTotal = home.teams.total; const aTotal = away.teams.total;
+            
+            const topCard = `
+                <div class="card-style">
+                    <div style="font-size:12px; color:var(--text-sub); text-align:center; font-weight:600; margin-bottom:4px;">FINAL</div>
+                    <div class="bs-scoreboard">
+                        <div class="bs-team-col">
+                            <img class="bs-team-logo" src="${getLogo(away.name)}">
+                            <div class="bs-team-name">${away.name}</div>
+                        </div>
+                        <div class="bs-score-col">${aTotal.won_score} <span style="color:#ccc; font-size:24px;">:</span> ${hTotal.won_score}</div>
+                        <div class="bs-team-col">
+                            <img class="bs-team-logo" src="${getLogo(home.name)}">
+                            <div class="bs-team-name">${home.name}</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const hQ = home.teams.rounds; const aQ = away.teams.rounds;
+            const qCard = `
+                <div class="card-style">
+                    <table class="q-table">
+                        <tr><th></th><th>Q1</th><th>Q2</th><th>Q3</th><th>Q4</th><th>T</th></tr>
+                        <tr><td>${away.name}</td><td>${aQ["1"]?.won_score||'-'}</td><td>${aQ["2"]?.won_score||'-'}</td><td>${aQ["3"]?.won_score||'-'}</td><td>${aQ["4"]?.won_score||'-'}</td><td>${aTotal.won_score}</td></tr>
+                        <tr><td>${home.name}</td><td>${hQ["1"]?.won_score||'-'}</td><td>${hQ["2"]?.won_score||'-'}</td><td>${hQ["3"]?.won_score||'-'}</td><td>${hQ["4"]?.won_score||'-'}</td><td>${hTotal.won_score}</td></tr>
+                    </table>
+                </div>
+            `;
+
+            const bfCard = `
+                <div class="card-style">
+                    <div class="bf-title">團隊數據 TEAM STATS</div>
+                    ${renderButterflyRow('二分%', aTotal.two_pointers_percentage, hTotal.two_pointers_percentage, true)}
+                    ${renderButterflyRow('三分%', aTotal.three_pointers_percentage, hTotal.three_pointers_percentage, true)}
+                    ${renderButterflyRow('罰球%', aTotal.free_throws_percentage, hTotal.free_throws_percentage, true)}
+                    ${renderButterflyRow('籃板', aTotal.rebounds, hTotal.rebounds)}
+                    ${renderButterflyRow('助攻', aTotal.assists, hTotal.assists)}
+                    ${renderButterflyRow('抄截', aTotal.steals, hTotal.steals)}
+                    ${renderButterflyRow('阻攻', aTotal.blocks, hTotal.blocks)}
+                    ${renderButterflyRow('失誤', aTotal.turnovers, hTotal.turnovers)}
+                </div>
+            `;
+
+            const targetData = teamType === 'home' ? home : away;
+            const total = targetData.teams.total;
+            const playerCard = `
+                <div class="card-style" style="padding: 16px 0;">
+                    <div style="padding: 0 16px;">
+                        <div class="team-tabs">
+                            <div class="team-tab ${teamType === 'away' ? 'active' : ''}" onclick="renderBoxScore('away')">${away.name}</div>
+                            <div class="team-tab ${teamType === 'home' ? 'active' : ''}" onclick="renderBoxScore('home')">${home.name}</div>
+                        </div>
+                    </div>
+                    ${buildPlayerTable(targetData.players.total)}
+                    <div style="padding: 0 16px; margin-top: 12px;">
+                        <table class="stats-table row-total">
+                            <tr>
+                                <td style="text-align:left;">TEAM TOTAL</td>
+                                <td>-</td><td>${total.won_score}</td><td>${total.field_goals}</td><td>${total.three_pointers}</td><td>${total.free_throws}</td>
+                                <td>${total.rebounds}</td><td>${total.assists}</td><td>${total.steals}</td><td>${total.blocks}</td><td>${total.turnovers}</td><td>${total.fouls}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('boxscore-content').innerHTML = topCard + qCard + bfCard + playerCard;
+        }
+
+        // --- 初始化資料抓取 ---
+        async function initApp() {
+            try {
+                // 1. 同時抓取四個 API 提升速度
+                const [gamesRes, standingsRes, newsRes, playersRes] = await Promise.all([
+                    fetch('https://api.tpbl.basketball/api/seasons/3/games'),
+                    fetch('https://api.tpbl.basketball/api/divisions/9/games/standings'),
+                    fetch('https://api.tpbl.basketball/api/teams/1/posts?type=news&page=1'),
+                    fetch('https://api.tpbl.basketball/api/divisions/35/players')
+                ]);
+                
+                allGames = await gamesRes.json();
+                const standings = await standingsRes.json();
+                const news = await newsRes.json();
+                const playersList = await playersRes.json();
+
+                // 2. 建立球員頭像字典
+                playersList.forEach(p => {
+                    const img = p.images && (p.images.find(i => i.key === 'sm') || p.images[0]);
+                    if(img) playerAvatars[p.gohoops_roster_id] = img.url;
+                });
+
+                // 3. 處理 Home 焦點賽事
+                if(allGames.length > 0) {
+                    let demoGames = JSON.parse(JSON.stringify(allGames.slice(0, 3)));
+                    demoGames[0].demoStatus = 'LIVE'; demoGames[1].demoStatus = 'UPCOMING'; demoGames[2].demoStatus = 'COMPLETED';
+                    demoGames.sort((a, b) => ({'LIVE':1, 'UPCOMING':2, 'COMPLETED':3}[a.demoStatus] - {'LIVE':1, 'UPCOMING':2, 'COMPLETED':3}[b.demoStatus]));
+
+                    const carousel = document.getElementById('home-carousel');
+                    const dotsContainer = document.getElementById('home-dots');
+                    carousel.innerHTML = demoGames.map(g => createGameCard(g, g.demoStatus)).join('');
+                    dotsContainer.innerHTML = demoGames.map((_, i) => `<div class="dot ${i===0?'active':''}"></div>`).join('');
+                    
+                    carousel.addEventListener('scroll', () => {
+                        const idx = Math.round(carousel.scrollLeft / (carousel.clientWidth * 0.88));
+                        dotsContainer.querySelectorAll('.dot').forEach((d, i) => d.classList.toggle('active', i === idx));
+                    });
+                }
+
+                // 4. 處理戰績排行
+                const standingsContainer = document.getElementById('home-standings');
+                standingsContainer.innerHTML = standings.map(s => {
+                    const totalGames = s.score_won_matches + s.score_lost_matches;
+                    const pct = totalGames > 0 ? (s.score_won_matches / totalGames).toFixed(3).replace(/^0/, '') : '.000';
+                    const logo = getLogo(s.team.name) || s.team.meta.logo;
+                    return `
+                        <tr>
+                            <td style="text-align:left; color:var(--text-sub);">${s.rank}</td>
+                            <td><div class="standings-team"><img class="standings-logo" src="${logo}"> ${s.team.name}</div></td>
+                            <td>${s.score_won_matches} - ${s.score_lost_matches}</td>
+                            <td>${pct}</td>
+                            <td>${s.games_behind}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                // 5. 處理最新快訊
+                const newsContainer = document.getElementById('home-news');
+                newsContainer.innerHTML = news.result.slice(0, 5).map(n => {
+                    const date = n.published_at.substring(0, 10);
+                    return `
+                        <div class="news-item" onclick="alert('開啟新聞: ${n.title}')">
+                            <img class="news-thumb" src="${n.thumbnail}">
+                            <div class="news-text">
+                                <div class="news-title">${n.title}</div>
+                                <div class="news-date">${date}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                /* 預設渲染賽程頁面 */
+                renderMonthFilters();
+
+            } catch (error) { console.error('API Error:', error); }
+        }
+
+        initApp();
+    </script>
+</body>
+</html>
